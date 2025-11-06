@@ -25,6 +25,27 @@ export default function AuthScreen() {
 
   const swap = () => setMode((m) => (m === "login" ? "signup" : "login"));
 
+  const getErrorMessage = (errorCode: string): string => {
+    switch (errorCode) {
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/invalid-email":
+        return "Invalid password, try again";
+      case "auth/user-not-found":
+        return "User not found";
+      case "auth/email-already-in-use":
+        return "Email already in use";
+      case "auth/weak-password":
+        return "Password is too weak";
+      case "auth/too-many-requests":
+        return "Too many attempts, try again later";
+      case "auth/network-request-failed":
+        return "Network error, check your connection";
+      default:
+        return "Operation failed, try again";
+    }
+  };
+
   const onSubmit = async () => {
     if (!email || !password || (mode === "signup" && !name)) {
       Alert.alert("Please fill all fields");
@@ -48,7 +69,8 @@ export default function AuthScreen() {
         await updateProfile(cred.user, { displayName: name.trim() });
       }
     } catch (e: any) {
-      Alert.alert("Error", e?.message ?? "Operation failed");
+      const errorMessage = getErrorMessage(e?.code);
+      Alert.alert("Error", errorMessage);
     } finally {
       setBusy(false);
     }
