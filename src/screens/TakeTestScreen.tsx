@@ -96,6 +96,17 @@ export default function TakeTestScreen({ route }: Props) {
         },
         { merge: true }
       );
+        const uref = doc(db, "users", uid);
+        const usnap = await getDoc(uref);
+        const coupleId = usnap.data()?.coupleId as string | undefined;
+
+      if (coupleId) {
+        await setDoc(
+          doc(db, "couples", coupleId, "responses", `${uid}_${testId}`),
+          { answers, submittedAt: serverTimestamp(), uid, testId },
+          { merge: true }
+        );
+      }
       Alert.alert("Valmis", "Vastaukset tallennettu! Laskemme parin tuloksen myöhemmin.");
     } catch (e: any) {
       Alert.alert("Tallennus epäonnistui", e?.message ?? "Virhe");

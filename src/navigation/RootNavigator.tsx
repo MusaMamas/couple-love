@@ -3,6 +3,8 @@ import AuthScreen from "../screens/AuthScreen";
 import HomeScreen from "../screens/HomeScreen";
 import TestsListScreen from "../screens/TestsListScreen";
 import TakeTestScreen from "../screens/TakeTestScreen";
+import PairOnboardingScreen from "../screens/PairOnboardingScreen";
+import PairDashboardScreen from "../screens/PairDashboardScreen";
 import { User } from "firebase/auth";
 
 export type RootStackParamList = {
@@ -22,6 +24,8 @@ export default function RootNavigator({ user }: { user: User | null }) {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="TestsList" component={TestsListScreen} />
           <Stack.Screen name="TakeTest" component={TakeTestScreen} />
+          <Stack.Screen name="PairSetup" component={PairOnboardingScreen} />
+          <Stack.Screen name="PairDashboard" component={PairDashboardScreen} />
         </>
       ) : (
         <Stack.Screen name="Auth" component={AuthScreen} />

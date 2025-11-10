@@ -19,6 +19,12 @@ export default function HomeScreen() {
       <TouchableOpacity onPress={logout} style={styles.danger}>
         <Text style={{ color: "#fff", fontWeight: "600" }}>Exit</Text>
       </TouchableOpacity>
+      <TouchableOpacity onPress={() => nav.navigate("PairSetup")} style={styles.primary}>
+        <Text style={{ color:"#fff", fontWeight:"600" }}>Couple settings</Text>
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => nav.navigate("PairDashboard")} style={styles.primary}>
+        <Text style={{ color:"#fff", fontWeight:"600" }}>Couple panel</Text>
+      </TouchableOpacity>
     </View>
   );
 }
