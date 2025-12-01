@@ -12,6 +12,8 @@ export type RootStackParamList = {
   Home: undefined;
   TestsList: undefined;
   TakeTest: { testId: string };
+  PairSetup: undefined;
+  PairDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

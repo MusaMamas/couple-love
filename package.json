@@ -15,14 +15,18 @@
     "@react-navigation/native": "^7.1.18",
     "@react-navigation/native-stack": "^7.3.28",
     "expo": "54.0.22",
+    "expo-constants": "^18.0.10",
     "expo-location": "~19.0.7",
     "expo-maps": "~0.12.8",
     "expo-notifications": "~0.32.12",
     "expo-status-bar": "~3.0.8",
     "firebase": "^12.4.0",
+    "i18next": "^25.6.3",
     "react": "19.1.0",
     "react-hook-form": "^7.65.0",
+    "react-i18next": "^16.3.5",
     "react-native": "0.81.5",
+    "react-native-dotenv": "^3.4.11",
     "react-native-paper": "^5.14.5",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
@@ -30,6 +34,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "@types/react-native-dotenv": "^0.2.2",
+    "babel-preset-expo": "^54.0.7",
     "typescript": "~5.9.2"
   },
   "private": true

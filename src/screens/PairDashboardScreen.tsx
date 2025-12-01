@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../../firebaseConfig";
 import { doc, onSnapshot } from "firebase/firestore";
 import { computeAndSaveCompatibility } from "../lib/pair";
@@ -9,7 +10,13 @@ export default function PairDashboardScreen() {
   const [score, setScore] = useState<number | null>(null);
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid!;
+    // FIXED: Checking for null before using uid
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      Alert.alert("Error", "User not authenticated");
+      return;
+    }
+    
     const unsub = onSnapshot(doc(db, "users", uid), (s) => {
       const cid = s.data()?.coupleId || null;
       setCoupleId(cid);
@@ -34,31 +41,52 @@ export default function PairDashboardScreen() {
 
   if (!coupleId) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Pair not set up</Text>
-        <Text style={{ marginTop: 6, color: "#555" }}>
-          Go to 'Pair Setup' to create a pair or enter by code.
-        </Text>
-      </View>
+      <SafeAreaView style={styles.safeArea} edges={["top"]}>
+        <View style={styles.container}>
+          <Text style={styles.title}>Pair not set up</Text>
+          <Text style={{ marginTop: 6, color: "#555" }}>
+            Go to 'Pair Setup' to create a pair or enter by code.
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Pair Dashboard</Text>
-      <Text style={{ marginTop: 8, fontSize: 16 }}>
-        Compatibility (compat_v1): {score == null ? "—" : `${score}%`}
-      </Text>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Pair Dashboard</Text>
+        <Text style={{ marginTop: 8, fontSize: 16 }}>
+          Compatibility (compat_v1): {score == null ? "—" : `${score}%`}
+        </Text>
 
-      <TouchableOpacity onPress={recompute} style={styles.primary}>
-        <Text style={{ color: "#fff", fontWeight: "700" }}>Recalculate</Text>
-      </TouchableOpacity>
-    </View>
+        <TouchableOpacity onPress={recompute} style={styles.primary}>
+          <Text style={{ color: "#fff", fontWeight: "700" }}>Recalculate</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: "#fff" },
-  title: { fontSize: 22, fontWeight: "700" },
-  primary: { marginTop: 16, backgroundColor: "#5a67d8", padding: 14, borderRadius: 12, alignItems: "center" },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  container: { 
+    flex: 1, 
+    padding: 24, 
+    backgroundColor: "#fff" 
+  },
+  title: { 
+    fontSize: 22, 
+    fontWeight: "700" 
+  },
+  primary: { 
+    marginTop: 16, 
+    backgroundColor: "#5a67d8", 
+    padding: 14, 
+    borderRadius: 12, 
+    alignItems: "center" 
+  },
 });

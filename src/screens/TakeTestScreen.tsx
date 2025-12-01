@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import testsCatalog from "../data/testsCatalog";
 import type { Question } from "../data/testsCatalog";
 import { db, auth } from "../../firebaseConfig";
@@ -57,17 +58,31 @@ export default function TakeTestScreen({ route }: Props) {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState(false);
 
-  useMemo(() => {
+  // FIXED: useEffect instead of useMemo for side effects
+  useEffect(() => {
+    let isMounted = true;
+    
     (async () => {
       const uid = auth.currentUser?.uid;
       if (!uid) return;
-      const ref = doc(db, "users", uid, "responses", testId);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const prev = snap.data()?.answers || {};
-        setAnswers(prev);
+      
+      try {
+        const ref = doc(db, "users", uid, "responses", testId);
+        const snap = await getDoc(ref);
+        
+        if (snap.exists() && isMounted) {
+          const prev = snap.data()?.answers || {};
+          setAnswers(prev);
+        }
+      } catch (error) {
+        console.error("Error loading previous answers:", error);
       }
     })();
+
+    // Cleanup function to prevent race condition
+    return () => {
+      isMounted = false;
+    };
   }, [testId]);
 
   const set = (qid: string, v: number) =>
@@ -76,17 +91,21 @@ export default function TakeTestScreen({ route }: Props) {
   const submit = async () => {
     const uid = auth.currentUser?.uid;
     if (!uid) {
-      Alert.alert("Virhe", "Käyttäjää ei löytynyt");
+      Alert.alert("Error", "User not found");
       return;
     }
-    // Tavallinen tarkistus, että kaikkiin kysymyksiin on vastattu
+    
+    // Checking that all questions have been answered
     const allAnswered = test.questions.every((q) => answers[q.id] != null);
     if (!allAnswered) {
-      Alert.alert("Täytä kaikki kysymykset");
+      Alert.alert("Please answer all questions");
       return;
     }
+    
     try {
       setBusy(true);
+      
+      // Saving user responses
       await setDoc(
         doc(db, "users", uid, "responses", testId),
         {
@@ -96,9 +115,11 @@ export default function TakeTestScreen({ route }: Props) {
         },
         { merge: true }
       );
-        const uref = doc(db, "users", uid);
-        const usnap = await getDoc(uref);
-        const coupleId = usnap.data()?.coupleId as string | undefined;
+      
+      // If the user is in a couple, save answers in couples
+      const uref = doc(db, "users", uid);
+      const usnap = await getDoc(uref);
+      const coupleId = usnap.data()?.coupleId as string | undefined;
 
       if (coupleId) {
         await setDoc(
@@ -107,45 +128,61 @@ export default function TakeTestScreen({ route }: Props) {
           { merge: true }
         );
       }
-      Alert.alert("Valmis", "Vastaukset tallennettu! Laskemme parin tuloksen myöhemmin.");
+      
+      Alert.alert("Done", "Your answers have been saved! We will calculate couple compatibility later.");
     } catch (e: any) {
-      Alert.alert("Tallennus epäonnistui", e?.message ?? "Virhe");
+      Alert.alert("Save failed", e?.message ?? "Error");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
-      <Text style={styles.title}>{test.title}</Text>
-      <Text style={{ color: "#555", marginBottom: 12 }}>{test.description}</Text>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
+        <Text style={styles.title}>{test.title}</Text>
+        <Text style={{ color: "#555", marginBottom: 12 }}>{test.description}</Text>
 
-      {test.questions.map((q: Question, idx) => (
-        <View key={q.id} style={styles.block}>
-          <Text style={styles.qIndex}>{idx + 1}.</Text>
-          <View style={{ flex: 1, gap: 10 }}>
-            <Text style={styles.qText}>{q.text}</Text>
-            <Likert
-              value={answers[q.id]}
-              onChange={(v) => set(q.id, v)}
-              labels={q.labels}
-            />
+        {test.questions.map((q: Question, idx) => (
+          <View key={q.id} style={styles.block}>
+            <Text style={styles.qIndex}>{idx + 1}.</Text>
+            <View style={{ flex: 1, gap: 10 }}>
+              <Text style={styles.qText}>{q.text}</Text>
+              <Likert
+                value={answers[q.id]}
+                onChange={(v) => set(q.id, v)}
+                labels={q.labels}
+              />
+            </View>
           </View>
-        </View>
-      ))}
+        ))}
 
-      <TouchableOpacity disabled={busy} onPress={submit} style={styles.button}>
-        <Text style={{ color: "#fff", fontWeight: "600" }}>
-          {busy ? "Tallennetaan..." : "Tallenna vastaukset"}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity disabled={busy} onPress={submit} style={styles.button}>
+          <Text style={{ color: "#fff", fontWeight: "600" }}>
+            {busy ? "Saving..." : "Save answers"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16, paddingTop: 42 },
-  title: { fontSize: 20, fontWeight: "700", marginBottom: 8 },
+  safeArea: { 
+    flex: 1, 
+    backgroundColor: "#fff" 
+  },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#fff", 
+    padding: 16 
+  },
+  title: { 
+    fontSize: 20, 
+    fontWeight: "700", 
+    marginBottom: 8,
+    marginTop: 8,
+  },
   block: {
     flexDirection: "row",
     gap: 10,
@@ -154,14 +191,25 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-  qIndex: { fontWeight: "700", width: 22, textAlign: "right", marginTop: 2 },
-  qText: { fontSize: 15 },
+  qIndex: { 
+    fontWeight: "700", 
+    width: 22, 
+    textAlign: "right", 
+    marginTop: 2 
+  },
+  qText: { 
+    fontSize: 15,
+    flexWrap: "wrap",
+    flexShrink: 1,
+  },
   chip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
     borderRadius: 10,
     backgroundColor: "#e8e8ff",
-    minWidth: 44,
+    minWidth: 40,
+    maxWidth: 60,
     alignItems: "center",
   },
   chipText: { fontWeight: "600" },
