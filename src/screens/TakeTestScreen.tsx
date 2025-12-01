@@ -49,6 +49,49 @@ function Likert({
   );
 }
 
+function Choice({
+  value,
+  onChange,
+  options,
+}: {
+  value?: number;
+  onChange: (v: number) => void;
+  options: [string, string];
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <TouchableOpacity
+        onPress={() => onChange(1)}
+        style={[
+          styles.choiceButton,
+          value === 1 && styles.choiceButtonSelected,
+        ]}
+      >
+        <Text style={[
+          styles.choiceText,
+          value === 1 && styles.choiceTextSelected
+        ]}>
+          {options[0]}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => onChange(2)}
+        style={[
+          styles.choiceButton,
+          value === 2 && styles.choiceButtonSelected,
+        ]}
+      >
+        <Text style={[
+          styles.choiceText,
+          value === 2 && styles.choiceTextSelected
+        ]}>
+          {options[1]}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function TakeTestScreen({ route }: Props) {
   const { testId } = route.params;
   const test = useMemo(
@@ -148,11 +191,19 @@ export default function TakeTestScreen({ route }: Props) {
             <Text style={styles.qIndex}>{idx + 1}.</Text>
             <View style={{ flex: 1, gap: 10 }}>
               <Text style={styles.qText}>{q.text}</Text>
-              <Likert
-                value={answers[q.id]}
-                onChange={(v) => set(q.id, v)}
-                labels={q.labels}
-              />
+              {q.type === "likert5" ? (
+                <Likert
+                  value={answers[q.id]}
+                  onChange={(v) => set(q.id, v)}
+                  labels={q.labels}
+                />
+              ) : q.type === "choice" && q.options ? (
+                <Choice
+                  value={answers[q.id]}
+                  onChange={(v) => set(q.id, v)}
+                  options={q.options}
+                />
+              ) : null}
             </View>
           </View>
         ))}
@@ -213,6 +264,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   chipText: { fontWeight: "600" },
+  choiceButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: "#e8e8ff",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  choiceButtonSelected: {
+    backgroundColor: "#5a67d8",
+    borderColor: "#5a67d8",
+  },
+  choiceText: {
+    fontSize: 15,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#333",
+  },
+  choiceTextSelected: {
+    color: "#fff",
+  },
   button: {
     marginTop: 6,
     backgroundColor: "#5a67d8",
