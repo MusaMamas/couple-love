@@ -63,6 +63,30 @@ export async function joinCoupleByCode(code: string) {
   return { coupleId: cdoc.id };
 }
 
+export async function updateRelationshipStartDate(coupleId: string, date: Date) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) throw new Error("User not authenticated");
+  
+  // Verify user is member of this couple
+  const coupleRef = doc(db, "couples", coupleId);
+  const coupleSnap = await getDoc(coupleRef);
+  
+  if (!coupleSnap.exists()) {
+    throw new Error("Couple not found");
+  }
+  
+  const members: string[] = coupleSnap.data()?.members || [];
+  if (!members.includes(uid)) {
+    throw new Error("You are not a member of this couple");
+  }
+  
+  // Update the start date
+  await updateDoc(coupleRef, {
+    startDate: date,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function computeAndSaveCompatibility(coupleId: string, testId: string) {
   const cr = doc(db, "couples", coupleId);
   const cs = await getDoc(cr);
