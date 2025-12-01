@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../firebaseConfig";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../navigation/RootNavigator";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
+import * as Location from 'expo-location';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -14,10 +15,8 @@ function calculateTimeTogether(startDate: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - startDate.getTime();
   
-  // Calculate total days
   const totalDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   
-  // Calculate years, months, days
   const years = Math.floor(totalDays / 365);
   const remainingDaysAfterYears = totalDays % 365;
   const months = Math.floor(remainingDaysAfterYears / 30);
@@ -38,11 +37,97 @@ function calculateTimeTogether(startDate: Date): string {
   return parts.join(', ');
 }
 
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  // Haversine formula
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  return distance;
+}
+
+function formatDistance(distanceKm: number): string {
+  if (distanceKm < 0.1) {
+    return "So close! 💜";
+  } else if (distanceKm < 1) {
+    return `${Math.round(distanceKm * 1000)} m`;
+  } else if (distanceKm < 10) {
+    return `${distanceKm.toFixed(1)} km`;
+  } else {
+    return `${Math.round(distanceKm)} km`;
+  }
+}
+
 export default function HomeScreen() {
   const nav = useNavigation<NavigationProp>();
   const [relationshipDuration, setRelationshipDuration] = useState<string | null>(null);
   const [coupleId, setCoupleId] = useState<string | null>(null);
+  const [showMode, setShowMode] = useState<'duration' | 'distance'>('duration');
+  const [distance, setDistance] = useState<string | null>(null);
+  const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [myLocation, setMyLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  const [partnerLocation, setPartnerLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
+  // Request location permission and start tracking
+  useEffect(() => {
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        setLocationPermission(true);
+      }
+    })();
+  }, []);
+
+  // Track current user's location
+  useEffect(() => {
+    if (!locationPermission || !coupleId) return;
+
+    let locationSubscription: Location.LocationSubscription | null = null;
+
+    (async () => {
+      const uid = auth.currentUser?.uid;
+      if (!uid) return;
+
+      // Watch position
+      locationSubscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 30000, // Update every 30 seconds
+          distanceInterval: 50, // Or when moved 50 meters
+        },
+        async (location) => {
+          const { latitude, longitude } = location.coords;
+          setMyLocation({ latitude, longitude });
+
+          // Update location in Firestore
+          try {
+            await updateDoc(doc(db, "users", uid), {
+              location: {
+                latitude,
+                longitude,
+                updatedAt: new Date(),
+              }
+            });
+          } catch (error) {
+            console.error("Error updating location:", error);
+          }
+        }
+      );
+    })();
+
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, [locationPermission, coupleId]);
+
+  // Subscribe to couple data and partner's location
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid) return;
@@ -56,10 +141,33 @@ export default function HomeScreen() {
         const coupleUnsub = onSnapshot(doc(db, "couples", cid), (coupleSnap) => {
           if (coupleSnap.exists()) {
             const data = coupleSnap.data();
+            
+            // Get relationship duration
             if (data?.startDate?.toDate) {
               const startDate = data.startDate.toDate();
               const duration = calculateTimeTogether(startDate);
               setRelationshipDuration(duration);
+            }
+
+            // Get partner's ID and subscribe to their location
+            const members: string[] = data.members || [];
+            const partnerId = members.find(id => id !== uid);
+            
+            if (partnerId) {
+              // Subscribe to partner's location
+              const partnerUnsub = onSnapshot(doc(db, "users", partnerId), (partnerSnap) => {
+                if (partnerSnap.exists()) {
+                  const partnerData = partnerSnap.data();
+                  if (partnerData?.location) {
+                    setPartnerLocation({
+                      latitude: partnerData.location.latitude,
+                      longitude: partnerData.location.longitude,
+                    });
+                  }
+                }
+              });
+              
+              return partnerUnsub;
             }
           }
         });
@@ -67,36 +175,56 @@ export default function HomeScreen() {
         return coupleUnsub;
       } else {
         setRelationshipDuration(null);
+        setPartnerLocation(null);
       }
     });
     
     return unsub;
   }, []);
 
-  // Update duration every hour
+  // Calculate distance when both locations are available
   useEffect(() => {
-    if (!relationshipDuration) return;
-    
-    const interval = setInterval(() => {
-      // Trigger re-fetch by updating a dummy state
-      // This will cause the snapshot listener to recalculate
-      const uid = auth.currentUser?.uid;
-      if (uid && coupleId) {
-        onSnapshot(doc(db, "couples", coupleId), (coupleSnap) => {
-          if (coupleSnap.exists()) {
-            const data = coupleSnap.data();
-            if (data?.startDate?.toDate) {
-              const startDate = data.startDate.toDate();
-              const duration = calculateTimeTogether(startDate);
-              setRelationshipDuration(duration);
-            }
-          }
-        });
+    if (myLocation && partnerLocation) {
+      const dist = calculateDistance(
+        myLocation.latitude,
+        myLocation.longitude,
+        partnerLocation.latitude,
+        partnerLocation.longitude
+      );
+      setDistance(formatDistance(dist));
+    } else {
+      setDistance(null);
+    }
+  }, [myLocation, partnerLocation]);
+
+  const requestLocationPermission = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === 'granted') {
+      setLocationPermission(true);
+      Alert.alert("Permission granted", "Location tracking enabled!");
+    } else {
+      Alert.alert("Permission denied", "Cannot track distance without location permission.");
+    }
+  };
+
+  const toggleMode = () => {
+    if (showMode === 'duration') {
+      if (!locationPermission) {
+        Alert.alert(
+          "Location Permission Required",
+          "To see distance between you and your partner, we need access to your location.",
+          [
+            { text: "Cancel", style: "cancel" },
+            { text: "Enable", onPress: requestLocationPermission }
+          ]
+        );
+      } else {
+        setShowMode('distance');
       }
-    }, 3600000); // Update every hour
-    
-    return () => clearInterval(interval);
-  }, [relationshipDuration, coupleId]);
+    } else {
+      setShowMode('duration');
+    }
+  };
 
   const logout = async () => {
     await signOut(auth);
@@ -108,11 +236,32 @@ export default function HomeScreen() {
         <View style={styles.container}>
           <Text style={styles.title}>Welcome to Couple-love 💜</Text>
           
-          {relationshipDuration && (
-            <View style={styles.durationCard}>
-              <Text style={styles.durationLabel}>Together for</Text>
-              <Text style={styles.durationValue}>{relationshipDuration}</Text>
-            </View>
+          {(relationshipDuration || (locationPermission && distance)) && (
+            <>
+              <View style={styles.durationCard}>
+                {showMode === 'duration' && relationshipDuration ? (
+                  <>
+                    <Text style={styles.durationLabel}>Together for</Text>
+                    <Text style={styles.durationValue}>{relationshipDuration}</Text>
+                  </>
+                ) : showMode === 'distance' ? (
+                  <>
+                    <Text style={styles.durationLabel}>Distance</Text>
+                    <Text style={styles.durationValue}>
+                      {distance || "Locating..."}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+
+              <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
+                <Text style={styles.toggleButtonText}>
+                  {showMode === 'duration' 
+                    ? '📍 Show Distance' 
+                    : '⏱️ Show Duration'}
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
           
           <TouchableOpacity 
@@ -175,10 +324,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 16,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 8,
     minWidth: 250,
     borderWidth: 2,
     borderColor: "#e0e0ff",
+    minHeight: 80,
+    justifyContent: "center",
   },
   durationLabel: {
     fontSize: 14,
@@ -191,6 +342,20 @@ const styles = StyleSheet.create({
     color: "#5a67d8",
     fontWeight: "700",
     textAlign: "center",
+  },
+  toggleButton: {
+    backgroundColor: "#fff",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#5a67d8",
+    marginBottom: 8,
+  },
+  toggleButtonText: {
+    color: "#5a67d8",
+    fontWeight: "600",
+    fontSize: 14,
   },
   primary: { 
     marginTop: 8, 
