@@ -16,7 +16,10 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "We need your location to show the distance between you and your partner.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the distance between you and your partner."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to show the distance between you and your partner.",
+        "NSCameraUsageDescription": "We need access to your camera to take photos for your memories.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to add photos to your memories.",
+        "NSPhotoLibraryAddUsageDescription": "We need permission to save photos to your library."
       }
     },
     "android": {
@@ -26,7 +29,11 @@
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -35,14 +42,19 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-maps",
       [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Couple-love to use your location to show distance to your partner."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you add memories to your map.",
+          "cameraPermission": "The app accesses your camera to let you take photos for your memories."
+        }
       ]
     ]
   }
 }
-

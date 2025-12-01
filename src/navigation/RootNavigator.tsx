@@ -5,6 +5,7 @@ import TestsListScreen from "../screens/TestsListScreen";
 import TakeTestScreen from "../screens/TakeTestScreen";
 import PairOnboardingScreen from "../screens/PairOnboardingScreen";
 import PairDashboardScreen from "../screens/PairDashboardScreen";
+import MemoryMapScreen from "../screens/MemoryMapScreen";
 import { User } from "firebase/auth";
 
 export type RootStackParamList = {
@@ -14,6 +15,7 @@ export type RootStackParamList = {
   TakeTest: { testId: string };
   PairSetup: undefined;
   PairDashboard: undefined;
+  MemoryMap: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -28,6 +30,7 @@ export default function RootNavigator({ user }: { user: User | null }) {
           <Stack.Screen name="TakeTest" component={TakeTestScreen} />
           <Stack.Screen name="PairSetup" component={PairOnboardingScreen} />
           <Stack.Screen name="PairDashboard" component={PairDashboardScreen} />
+          <Stack.Screen name="MemoryMap" component={MemoryMapScreen} />
         </>
       ) : (
         <Stack.Screen name="Auth" component={AuthScreen} />

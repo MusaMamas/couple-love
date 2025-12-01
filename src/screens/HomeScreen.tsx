@@ -286,6 +286,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity 
+            onPress={() => nav.navigate("MemoryMap")} 
+            style={styles.primary}
+          >
+            <Text style={styles.buttonText}>Our Memories 🗺️</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
             onPress={logout} 
             style={styles.danger}
           >
